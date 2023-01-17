@@ -3,15 +3,13 @@ import os
 import random
 import requests
 import time
+import uuid
 
 from datetime import datetime
 
-deviceid = os.environ.get('DEVICEID')
 uno = os.environ.get('UNO')
 acc = os.environ.get('ACC')
 password = os.environ.get('PASSWORD')
-token = os.environ.get('TOKEN')
-# XXX: test different account for token
 
 now = datetime.now().date().strftime('%Y%m%d')
 absolutepath = os.path.abspath(__file__)
@@ -23,7 +21,7 @@ def get_new_token():
         "uno": uno,
         "acc": acc,
         "pwd": password,
-        "token": token
+        "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzb3VyY2UiOiJhcHAtcHJvZCIsImNpZCI6MCwiaWF0IjoxNTUzNzUzMTQwfQ.ieJiJtNsseSO5fxNH1XTa6bqHZ0zUyoPVUYPNtOj4TM"
     }
     resp = requests.post(url, data=data)
     auth_token = resp.json()['data']['access']
@@ -34,17 +32,22 @@ def punch(auth_token):
     url = 'https://pro.104.com.tw/prohrm/api/app/card/gps'
     lat, lon = get_location()
     data = {
-        "deviceId": deviceid,
+        "deviceId": gen_device_id(),
         "latitude": lat,
         "longitude": lon
     }
-    header = {'Authorization': 'Bearer ' + auth_token}
-    resp = requests.post(url, data=data, headers=header)
+    headers = {'Authorization': 'Bearer ' + auth_token}
+    resp = requests.post(url, data=data, headers=headers)
     if resp.status_code != 200:
         print(resp.text)
         punch(get_new_token())
     else:
         print(resp.text)
+
+def gen_device_id():
+    """Generate deveice id."""
+    device_id = uuid.uuid5(uuid.NAMESPACE_DNS, acc)
+    return str(device_id).upper()
 
 def get_location():
     """Get random location."""
@@ -60,7 +63,7 @@ def get_workday():
     """Get workday."""
     pat = os.path.dirname(absolutepath)
     workday = {}
-    with open(f'{pat}/111年中華民國政府行政機關辦公日曆表.csv', newline='', encoding='big5') as f:
+    with open(f'{pat}/112年中華民國政府行政機關辦公日曆表.csv', newline='', encoding='big5') as f:
         reader = csv.reader(f)
         for row in reader:
             workday[row[0]] = row[2]
