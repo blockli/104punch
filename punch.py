@@ -10,6 +10,7 @@ from datetime import datetime
 uno = os.environ.get('UNO')
 acc = os.environ.get('ACC')
 password = os.environ.get('PASSWORD')
+line_token = os.environ.get('LINE_TOKEN')
 
 now = datetime.now().date().strftime('%Y%m%d')
 absolutepath = os.path.abspath(__file__)
@@ -38,11 +39,10 @@ def punch(auth_token):
     }
     headers = {'Authorization': 'Bearer ' + auth_token}
     resp = requests.post(url, data=data, headers=headers)
-    if resp.status_code != 200:
-        print(resp.text)
-        punch(get_new_token())
+    if resp.status_code == 200:
+        send_notify('打卡成功！')
     else:
-        print(resp.text)
+        send_notify('打卡失敗，記得打卡！')
 
 def gen_device_id():
     """Generate deveice id."""
@@ -68,6 +68,15 @@ def get_workday():
         for row in reader:
             workday[row[0]] = row[2]
     return workday
+
+def send_notify(state):
+    """Send line notify."""
+    headers = {
+        "Authorization": "Bearer " + line_token,
+        "Content-Type": "application/x-www-form-urlencoded"
+    }
+    params = {"message": now + state}
+    requests.post("https://notify-api.line.me/api/notify", headers=headers, params=params)
 
 def main():
     workday = get_workday()
