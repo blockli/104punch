@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>104 打卡系統</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: #ffffff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 15px;
+            text-align: center;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+
+        .header .subtitle {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .card {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid #e9ecef;
+        }
+
+        .card-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e9ecef;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            color: #333;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 2px solid #e1e1e1;
+            border-radius: 8px;
+            font-size: 15px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            width: 100%;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            color: white;
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #eb3349 0%, #f45c43 100%);
+            color: white;
+        }
+
+        .btn-small {
+            width: auto;
+            padding: 8px 16px;
+            font-size: 13px;
+        }
+
+        /* 狀態卡片 */
+        .status-row {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .status-card {
+            flex: 1;
+            min-width: 200px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .status-card .time {
+            font-size: 28px;
+            font-weight: 700;
+            color: #333;
+        }
+
+        .status-card .date {
+            font-size: 13px;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .status-card .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 15px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-top: 10px;
+        }
+
+        .badge.work { background: #d4edda; color: #155724; }
+        .badge.holiday { background: #f8d7da; color: #721c24; }
+        .badge.skip { background: #fff3cd; color: #856404; }
+
+        .user-card {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            background: #e8f4fd;
+            border-radius: 12px;
+            padding: 15px 20px;
+        }
+
+        .user-card .avatar {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .user-card .info {
+            flex: 1;
+        }
+
+        .user-card .name {
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .user-card .label {
+            font-size: 12px;
+            color: #666;
+        }
+
+        /* 月曆 */
+        .calendar-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .calendar-nav button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .calendar-nav button:hover {
+            background: #5a6fd6;
+        }
+
+        .calendar-nav .month-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .calendar {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .calendar th {
+            padding: 10px;
+            text-align: center;
+            font-size: 13px;
+            color: #666;
+            font-weight: 500;
+        }
+
+        .calendar td {
+            padding: 5px;
+            text-align: center;
+            vertical-align: top;
+        }
+
+        .calendar .day-cell {
+            min-height: 60px;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 5px;
+            cursor: pointer;
+            transition: background 0.2s;
+            position: relative;
+        }
+
+        .calendar .day-cell:hover {
+            background: #f0f0f0;
+        }
+
+        .calendar .day-cell.empty {
+            background: transparent;
+            border: none;
+            cursor: default;
+        }
+
+        .calendar .day-cell.today {
+            border: 2px solid #667eea;
+        }
+
+        .calendar .day-cell.holiday {
+            background: #fff5f5;
+        }
+
+        .calendar .day-cell.skip {
+            background: #fff9e6;
+        }
+
+        .calendar .day-cell.punched {
+            background: #e8f5e9;
+        }
+
+        .calendar .day-num {
+            font-size: 14px;
+            font-weight: 500;
+            color: #333;
+        }
+
+        .calendar .day-cell.holiday .day-num {
+            color: #dc3545;
+        }
+
+        .calendar .day-indicators {
+            display: flex;
+            gap: 3px;
+            justify-content: center;
+            margin-top: 5px;
+            flex-wrap: wrap;
+        }
+
+        .calendar .indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .indicator.punch { background: #28a745; }
+        .indicator.skip { background: #ffc107; }
+
+        /* 不打卡日期管理 */
+        .skip-form {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .skip-form input[type="date"] {
+            flex: 1;
+            padding: 10px;
+            border: 2px solid #e1e1e1;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .skip-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .skip-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 12px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+
+        .skip-item .date-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .skip-item .weekday {
+            font-size: 11px;
+            background: #e9ecef;
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: #666;
+        }
+
+        .btn-delete {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .btn-delete:hover {
+            background: #c82333;
+        }
+
+        /* 打卡紀錄 */
+        .history-list {
+            max-height: 250px;
+            overflow-y: auto;
+        }
+
+        .history-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 12px;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .history-item:last-child {
+            border-bottom: none;
+        }
+
+        .history-item .datetime {
+            font-size: 14px;
+            color: #333;
+        }
+
+        .history-item .status {
+            font-size: 12px;
+            padding: 3px 8px;
+            border-radius: 4px;
+        }
+
+        .history-item .status.success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .history-item .status.fail {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        /* 訊息 */
+        .message {
+            padding: 10px 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-size: 14px;
+            text-align: center;
+            display: none;
+        }
+
+        .message.success { background: #d4edda; color: #155724; display: block; }
+        .message.error { background: #f8d7da; color: #721c24; display: block; }
+
+        .punch-result {
+            text-align: center;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            display: none;
+        }
+
+        .punch-result.show { display: block; }
+        .punch-result .icon { font-size: 36px; margin-bottom: 8px; }
+        .punch-result .text { font-size: 15px; font-weight: 500; }
+        .punch-result .timestamp { font-size: 12px; color: #666; margin-top: 5px; }
+
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .empty-text {
+            text-align: center;
+            color: #999;
+            padding: 20px;
+            font-size: 14px;
+        }
+
+        #login-section, #dashboard-section {
+            display: none;
+        }
+
+        #login-section.active, #dashboard-section.active {
+            display: block;
+        }
+
+        /* 圖例 */
+        .legend {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 10px;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+
+        .legend-dot.punched { background: #28a745; }
+        .legend-dot.skip { background: #ffc107; }
+        .legend-dot.holiday { background: #dc3545; }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .grid-2 {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>104 打卡系統</h1>
+            <div class="subtitle">GPS 打卡助手</div>
+        </div>
+
+        <!-- 登入區塊 -->
+        <div id="login-section">
+            <div class="card" style="max-width: 400px; margin: 0 auto;">
+                <div class="card-title">登入</div>
+                <div id="login-message" class="message"></div>
+                <form id="login-form">
+                    <div class="form-group">
+                        <label>公司代碼 (UNO)</label>
+                        <input type="text" id="uno" placeholder="請輸入公司代碼" required>
+                    </div>
+                    <div class="form-group">
+                        <label>帳號</label>
+                        <input type="text" id="acc" placeholder="請輸入帳號" required>
+                    </div>
+                    <div class="form-group">
+                        <label>密碼</label>
+                        <input type="password" id="password" placeholder="請輸入密碼" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary" id="login-btn">登入</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- 主畫面 -->
+        <div id="dashboard-section">
+            <!-- 狀態列 -->
+            <div class="status-row">
+                <div class="status-card" style="flex: 2;">
+                    <div class="time" id="current-time">--:--:--</div>
+                    <div class="date" id="current-date">----年--月--日</div>
+                    <span class="badge work" id="workday-badge">工作日</span>
+                </div>
+                <div class="status-card user-card">
+                    <div class="avatar" id="user-avatar">U</div>
+                    <div class="info">
+                        <div class="name" id="user-name">使用者</div>
+                        <div class="label">已登入</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 打卡區 -->
+            <div class="card">
+                <div class="card-title">手動打卡</div>
+                <div id="punch-result" class="punch-result">
+                    <div class="icon" id="punch-icon"></div>
+                    <div class="text" id="punch-text"></div>
+                    <div class="timestamp" id="punch-timestamp"></div>
+                </div>
+                <button class="btn btn-success" id="punch-btn">立即打卡</button>
+            </div>
+
+            <!-- 月曆 -->
+            <div class="card">
+                <div class="card-title">打卡月曆</div>
+                <div class="calendar-nav">
+                    <button id="prev-month">&lt; 上月</button>
+                    <span class="month-title" id="calendar-title">2024年12月</span>
+                    <button id="next-month">下月 &gt;</button>
+                </div>
+                <table class="calendar">
+                    <thead>
+                        <tr>
+                            <th>日</th>
+                            <th>一</th>
+                            <th>二</th>
+                            <th>三</th>
+                            <th>四</th>
+                            <th>五</th>
+                            <th>六</th>
+                        </tr>
+                    </thead>
+                    <tbody id="calendar-body"></tbody>
+                </table>
+                <div class="legend">
+                    <div class="legend-item"><div class="legend-dot punched"></div> 已打卡</div>
+                    <div class="legend-item"><div class="legend-dot skip"></div> 不打卡日</div>
+                    <div class="legend-item"><div class="legend-dot holiday"></div> 假日</div>
+                </div>
+            </div>
+
+            <div class="grid-2">
+                <!-- 不打卡日期管理 -->
+                <div class="card">
+                    <div class="card-title">不打卡日期設定</div>
+                    <div id="skip-message" class="message"></div>
+                    <div class="skip-form">
+                        <input type="date" id="skip-date-input">
+                        <button class="btn btn-primary btn-small" id="add-skip-date-btn">新增</button>
+                    </div>
+                    <div class="skip-list" id="skip-dates-list">
+                        <div class="empty-text">尚無設定不打卡日期</div>
+                    </div>
+                </div>
+
+                <!-- 打卡紀錄 -->
+                <div class="card">
+                    <div class="card-title">打卡紀錄</div>
+                    <div class="history-list" id="punch-history-list">
+                        <div class="empty-text">尚無打卡紀錄</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <button class="btn btn-danger" id="logout-btn">登出</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentYear, currentMonth;
+
+        // 初始化月曆日期
+        function initCalendarDate() {
+            const now = new Date();
+            currentYear = now.getFullYear();
+            currentMonth = now.getMonth() + 1;
+        }
+
+        // 更新時間
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('current-time').textContent =
+                now.toLocaleTimeString('zh-TW', { hour12: false });
+            document.getElementById('current-date').textContent =
+                now.toLocaleDateString('zh-TW', {
+                    year: 'numeric', month: 'long', day: 'numeric', weekday: 'long'
+                });
+        }
+
+        // 檢查登入狀態
+        async function checkStatus() {
+            try {
+                const resp = await fetch('/api/status');
+                const data = await resp.json();
+
+                if (data.logged_in) {
+                    showDashboard(data);
+                    loadCalendar();
+                    loadSkipDates();
+                    loadPunchHistory();
+                } else {
+                    showLogin();
+                }
+
+                // 更新工作日狀態
+                const badge = document.getElementById('workday-badge');
+                badge.textContent = data.workday_text;
+                badge.className = 'badge ' + (data.is_skip_date ? 'skip' : (data.is_workday ? 'work' : 'holiday'));
+            } catch (e) {
+                showLogin();
+            }
+        }
+
+        function showLogin() {
+            document.getElementById('login-section').classList.add('active');
+            document.getElementById('dashboard-section').classList.remove('active');
+        }
+
+        function showDashboard(data) {
+            document.getElementById('login-section').classList.remove('active');
+            document.getElementById('dashboard-section').classList.add('active');
+            if (data && data.acc) {
+                document.getElementById('user-name').textContent = data.acc;
+                document.getElementById('user-avatar').textContent = data.acc.charAt(0).toUpperCase();
+            }
+        }
+
+        function showMessage(elementId, message, isError) {
+            const el = document.getElementById(elementId);
+            el.textContent = message;
+            el.className = 'message ' + (isError ? 'error' : 'success');
+            setTimeout(() => { el.className = 'message'; }, 3000);
+        }
+
+        // 登入
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('login-btn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading"></span>';
+
+            try {
+                const resp = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        uno: document.getElementById('uno').value,
+                        acc: document.getElementById('acc').value,
+                        password: document.getElementById('password').value
+                    })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    checkStatus();
+                } else {
+                    showMessage('login-message', data.message, true);
+                }
+            } catch (e) {
+                showMessage('login-message', '連線錯誤', true);
+            }
+            btn.disabled = false;
+            btn.textContent = '登入';
+        });
+
+        // 登出
+        document.getElementById('logout-btn').addEventListener('click', async () => {
+            await fetch('/api/logout', { method: 'POST' });
+            showLogin();
+            document.getElementById('punch-result').classList.remove('show');
+        });
+
+        // 打卡
+        document.getElementById('punch-btn').addEventListener('click', async () => {
+            const btn = document.getElementById('punch-btn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading"></span> 打卡中...';
+
+            try {
+                const resp = await fetch('/api/punch', { method: 'POST' });
+                const data = await resp.json();
+
+                const resultEl = document.getElementById('punch-result');
+                document.getElementById('punch-icon').textContent = data.success ? '✅' : '❌';
+                document.getElementById('punch-text').textContent = data.message;
+                document.getElementById('punch-text').style.color = data.success ? '#155724' : '#721c24';
+                document.getElementById('punch-timestamp').textContent = data.timestamp;
+                resultEl.classList.add('show');
+
+                if (resp.status === 401) {
+                    setTimeout(() => showLogin(), 2000);
+                } else {
+                    loadCalendar();
+                    loadPunchHistory();
+                }
+            } catch (e) {
+                console.error('Punch error:', e);
+            }
+            btn.disabled = false;
+            btn.textContent = '立即打卡';
+        });
+
+        // 載入月曆
+        async function loadCalendar() {
+            const yearMonth = `${currentYear}${String(currentMonth).padStart(2, '0')}`;
+            document.getElementById('calendar-title').textContent = `${currentYear}年${currentMonth}月`;
+
+            try {
+                const resp = await fetch(`/api/calendar/${yearMonth}`);
+                const data = await resp.json();
+
+                if (data.success) {
+                    renderCalendar(data.calendar);
+                }
+            } catch (e) {
+                console.error('Load calendar error:', e);
+            }
+        }
+
+        function renderCalendar(calendarData) {
+            const tbody = document.getElementById('calendar-body');
+            const today = new Date();
+            const todayStr = `${today.getFullYear()}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}`;
+
+            let html = '';
+            for (const week of calendarData) {
+                html += '<tr>';
+                for (const day of week) {
+                    if (day === null) {
+                        html += '<td><div class="day-cell empty"></div></td>';
+                    } else {
+                        let classes = ['day-cell'];
+                        if (day.date === todayStr) classes.push('today');
+                        if (!day.is_workday) classes.push('holiday');
+                        if (day.is_skip) classes.push('skip');
+                        if (day.punch_records.length > 0) classes.push('punched');
+
+                        let indicators = '';
+                        if (day.punch_records.length > 0) {
+                            indicators += '<div class="indicator punch"></div>';
+                        }
+                        if (day.is_skip) {
+                            indicators += '<div class="indicator skip"></div>';
+                        }
+
+                        html += `<td>
+                            <div class="${classes.join(' ')}" data-date="${day.date}" onclick="toggleSkipDate('${day.date}', ${day.is_skip})">
+                                <div class="day-num">${day.day}</div>
+                                <div class="day-indicators">${indicators}</div>
+                            </div>
+                        </td>`;
+                    }
+                }
+                html += '</tr>';
+            }
+            tbody.innerHTML = html;
+        }
+
+        // 點擊日期切換不打卡狀態
+        async function toggleSkipDate(date, isSkip) {
+            try {
+                if (isSkip) {
+                    await fetch(`/api/skip-dates/${date}`, { method: 'DELETE' });
+                } else {
+                    const dateFormatted = `${date.slice(0,4)}-${date.slice(4,6)}-${date.slice(6,8)}`;
+                    await fetch('/api/skip-dates', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ date: dateFormatted })
+                    });
+                }
+                loadCalendar();
+                loadSkipDates();
+                checkStatus();
+            } catch (e) {
+                console.error('Toggle skip date error:', e);
+            }
+        }
+
+        // 月曆導航
+        document.getElementById('prev-month').addEventListener('click', () => {
+            currentMonth--;
+            if (currentMonth < 1) { currentMonth = 12; currentYear--; }
+            loadCalendar();
+        });
+
+        document.getElementById('next-month').addEventListener('click', () => {
+            currentMonth++;
+            if (currentMonth > 12) { currentMonth = 1; currentYear++; }
+            loadCalendar();
+        });
+
+        // 載入不打卡日期列表
+        async function loadSkipDates() {
+            try {
+                const resp = await fetch('/api/skip-dates');
+                const data = await resp.json();
+
+                const listEl = document.getElementById('skip-dates-list');
+                if (data.success && data.dates.length > 0) {
+                    listEl.innerHTML = data.dates.map(d => `
+                        <div class="skip-item">
+                            <div class="date-info">
+                                <span>${d.display}</span>
+                                <span class="weekday">週${d.weekday}</span>
+                            </div>
+                            <button class="btn-delete" onclick="deleteSkipDate('${d.date}')">刪除</button>
+                        </div>
+                    `).join('');
+                } else {
+                    listEl.innerHTML = '<div class="empty-text">尚無設定不打卡日期</div>';
+                }
+            } catch (e) {
+                console.error('Load skip dates error:', e);
+            }
+        }
+
+        // 新增不打卡日期
+        document.getElementById('add-skip-date-btn').addEventListener('click', async () => {
+            const dateInput = document.getElementById('skip-date-input');
+            const date = dateInput.value;
+            if (!date) {
+                showMessage('skip-message', '請選擇日期', true);
+                return;
+            }
+
+            try {
+                const resp = await fetch('/api/skip-dates', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ date })
+                });
+                const data = await resp.json();
+                showMessage('skip-message', data.message, !data.success);
+                if (data.success) {
+                    dateInput.value = '';
+                    loadSkipDates();
+                    loadCalendar();
+                    checkStatus();
+                }
+            } catch (e) {
+                showMessage('skip-message', '連線錯誤', true);
+            }
+        });
+
+        // 刪除不打卡日期
+        async function deleteSkipDate(date) {
+            try {
+                await fetch(`/api/skip-dates/${date}`, { method: 'DELETE' });
+                loadSkipDates();
+                loadCalendar();
+                checkStatus();
+            } catch (e) {
+                console.error('Delete skip date error:', e);
+            }
+        }
+
+        // 載入打卡紀錄
+        async function loadPunchHistory() {
+            try {
+                const resp = await fetch('/api/punch-history');
+                const data = await resp.json();
+
+                const listEl = document.getElementById('punch-history-list');
+                if (data.success && data.history.length > 0) {
+                    listEl.innerHTML = data.history.slice(0, 20).map(h => `
+                        <div class="history-item">
+                            <span class="datetime">${h.datetime}</span>
+                            <span class="status ${h.success ? 'success' : 'fail'}">${h.success ? '成功' : '失敗'}</span>
+                        </div>
+                    `).join('');
+                } else {
+                    listEl.innerHTML = '<div class="empty-text">尚無打卡紀錄</div>';
+                }
+            } catch (e) {
+                console.error('Load punch history error:', e);
+            }
+        }
+
+        // 初始化
+        initCalendarDate();
+        updateClock();
+        setInterval(updateClock, 1000);
+        checkStatus();
+    </script>
+</body>
+</html>
