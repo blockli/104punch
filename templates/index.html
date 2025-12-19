@@ -509,6 +509,440 @@
                 grid-template-columns: 1fr;
             }
         }
+
+        /* 自動打卡設定 */
+        .settings-form {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .setting-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .setting-row:last-child {
+            border-bottom: none;
+        }
+
+        .setting-label {
+            font-weight: 500;
+            color: #333;
+        }
+
+        .setting-desc {
+            font-size: 12px;
+            color: #666;
+            margin-top: 3px;
+        }
+
+        .setting-control {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .setting-control input[type="time"],
+        .setting-control input[type="number"] {
+            padding: 8px 12px;
+            border: 2px solid #e1e1e1;
+            border-radius: 6px;
+            font-size: 14px;
+            width: 100px;
+        }
+
+        .setting-control input[type="text"] {
+            padding: 8px 12px;
+            border: 2px solid #e1e1e1;
+            border-radius: 6px;
+            font-size: 14px;
+            width: 200px;
+        }
+
+        /* Toggle Switch */
+        .toggle-switch {
+            position: relative;
+            width: 50px;
+            height: 26px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: 0.3s;
+            border-radius: 26px;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: 0.3s;
+            border-radius: 50%;
+        }
+
+        input:checked + .toggle-slider {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        }
+
+        input:checked + .toggle-slider:before {
+            transform: translateX(24px);
+        }
+
+        .scheduler-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 15px;
+            background: #f0f7ff;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .scheduler-status .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #28a745;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .scheduler-status .info {
+            font-size: 13px;
+            color: #333;
+        }
+
+        .collapsible-header {
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .collapsible-header .arrow {
+            transition: transform 0.3s;
+        }
+
+        .collapsible-header.open .arrow {
+            transform: rotate(180deg);
+        }
+
+        .collapsible-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+
+        .collapsible-content.open {
+            max-height: 500px;
+        }
+
+        /* 打卡排程摘要 */
+        .schedule-summary {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .schedule-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 15px;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 15px;
+        }
+
+        .schedule-status.enabled {
+            background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+            color: #155724;
+        }
+
+        .schedule-status.disabled {
+            background: #f8f9fa;
+            color: #6c757d;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .status-indicator.active {
+            background: #28a745;
+            box-shadow: 0 0 8px rgba(40, 167, 69, 0.5);
+            animation: pulse 2s infinite;
+        }
+
+        .status-indicator.inactive {
+            background: #adb5bd;
+        }
+
+        .schedule-details {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+
+        @media (max-width: 600px) {
+            .schedule-details {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .schedule-item {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .schedule-label {
+            display: block;
+            font-size: 12px;
+            color: #6c757d;
+            margin-bottom: 4px;
+        }
+
+        .schedule-value {
+            display: block;
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .schedule-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .schedule-actions .btn {
+            flex: 1;
+        }
+
+        .btn-outline {
+            background: white;
+            border: 2px solid #667eea;
+            color: #667eea;
+        }
+
+        .btn-outline:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        /* 多排程列表樣式 */
+        .schedules-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .schedule-card {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 15px;
+            border: 2px solid transparent;
+            transition: border-color 0.2s;
+        }
+
+        .schedule-card.enabled {
+            border-color: #28a745;
+            background: linear-gradient(135deg, #f0fff4 0%, #e8f5e9 100%);
+        }
+
+        .schedule-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .schedule-card-title {
+            font-weight: 600;
+            font-size: 16px;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .schedule-card-title .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .schedule-card-title .status-dot.active {
+            background: #28a745;
+        }
+
+        .schedule-card-title .status-dot.inactive {
+            background: #adb5bd;
+        }
+
+        .schedule-card-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .schedule-card-body {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+
+        @media (max-width: 500px) {
+            .schedule-card-body {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        .schedule-info-item {
+            text-align: center;
+        }
+
+        .schedule-info-label {
+            font-size: 11px;
+            color: #6c757d;
+        }
+
+        .schedule-info-value {
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .btn-icon {
+            width: 32px;
+            height: 32px;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .btn-add-schedule {
+            width: 100%;
+            padding: 15px;
+            border: 2px dashed #667eea;
+            background: transparent;
+            color: #667eea;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-add-schedule:hover {
+            background: #f0f4ff;
+        }
+
+        /* 編輯排程的 Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-overlay.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            max-width: 400px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+        }
+
+        .modal-body {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .modal-footer {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .modal-footer .btn {
+            flex: 1;
+        }
+
+        .no-schedules {
+            text-align: center;
+            padding: 30px;
+            color: #666;
+        }
+
+        .no-schedules-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
     </style>
 </head>
 <body>
@@ -559,6 +993,18 @@
                 </div>
             </div>
 
+            <!-- 我的打卡排程 -->
+            <div class="card" id="schedule-card">
+                <div class="card-title">我的打卡排程</div>
+                <div class="schedules-list" id="schedules-list">
+                    <div class="no-schedules">
+                        <div class="no-schedules-icon">📅</div>
+                        <div>尚未設定打卡排程</div>
+                    </div>
+                </div>
+                <button class="btn-add-schedule" onclick="openScheduleModal()">+ 新增排程</button>
+            </div>
+
             <!-- 打卡區 -->
             <div class="card">
                 <div class="card-title">手動打卡</div>
@@ -568,6 +1014,42 @@
                     <div class="timestamp" id="punch-timestamp"></div>
                 </div>
                 <button class="btn btn-success" id="punch-btn">立即打卡</button>
+            </div>
+
+            <!-- Telegram 通知設定 -->
+            <div class="card">
+                <div class="card-title collapsible-header" onclick="toggleAutoSettings()">
+                    Telegram 通知設定
+                    <span class="arrow">▼</span>
+                </div>
+                <div id="auto-settings-content" class="collapsible-content">
+                    <div class="scheduler-status" id="scheduler-status">
+                        <div class="dot"></div>
+                        <div class="info">排程器運行中，每分鐘檢查一次</div>
+                    </div>
+
+                    <div id="settings-message" class="message"></div>
+
+                    <div class="settings-form">
+                        <div class="setting-row">
+                            <div>
+                                <div class="setting-label">Telegram 通知（選填）</div>
+                                <div class="setting-desc">打卡結果會發送到 Telegram</div>
+                            </div>
+                        </div>
+
+                        <div class="setting-row" style="flex-direction: column; align-items: stretch;">
+                            <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                                <input type="text" id="telegram-token" placeholder="Bot Token" style="flex: 1;">
+                            </div>
+                            <div style="display: flex; gap: 10px;">
+                                <input type="text" id="telegram-chat-id" placeholder="Chat ID" style="flex: 1;">
+                            </div>
+                        </div>
+
+                        <button class="btn btn-primary" id="save-telegram-btn">儲存通知設定</button>
+                    </div>
+                </div>
             </div>
 
             <!-- 月曆 -->
@@ -628,8 +1110,52 @@
         </div>
     </div>
 
+    <!-- 排程編輯 Modal -->
+    <div class="modal-overlay" id="schedule-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title" id="modal-title">新增排程</div>
+                <button class="modal-close" onclick="closeScheduleModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="edit-schedule-id">
+                <div class="form-group">
+                    <label>排程名稱</label>
+                    <input type="text" id="edit-schedule-name" placeholder="例如：上班、下班">
+                </div>
+                <div class="form-group">
+                    <label>打卡時間</label>
+                    <input type="time" id="edit-schedule-time" value="09:00">
+                </div>
+                <div class="form-group">
+                    <label>隨機延遲範圍（分鐘）</label>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <input type="number" id="edit-delay-min" value="0" min="0" max="30" style="width: 80px;">
+                        <span>~</span>
+                        <input type="number" id="edit-delay-max" value="15" min="0" max="60" style="width: 80px;">
+                    </div>
+                </div>
+                <div class="setting-row">
+                    <div>
+                        <div class="setting-label">啟用此排程</div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="edit-schedule-enabled" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeScheduleModal()">取消</button>
+                <button class="btn btn-primary" id="save-schedule-btn" onclick="saveSchedule()">儲存</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         let currentYear, currentMonth;
+        let currentSchedules = [];
+        let currentStatusData = null;
 
         // 初始化月曆日期
         function initCalendarDate() {
@@ -685,6 +1211,9 @@
                 document.getElementById('user-name').textContent = data.acc;
                 document.getElementById('user-avatar').textContent = data.acc.charAt(0).toUpperCase();
             }
+            // 載入自動打卡設定
+            loadUserSettings();
+            loadSchedulerStatus();
         }
 
         function showMessage(elementId, message, isError) {
@@ -937,6 +1466,253 @@
                 console.error('Load punch history error:', e);
             }
         }
+
+        // ============ 多排程管理 ============
+        function toggleAutoSettings() {
+            const header = document.querySelector('.collapsible-header');
+            const content = document.getElementById('auto-settings-content');
+            header.classList.toggle('open');
+            content.classList.toggle('open');
+        }
+
+        // 渲染排程列表
+        function renderSchedulesList(schedules, statusData) {
+            const listEl = document.getElementById('schedules-list');
+            currentSchedules = schedules;
+            currentStatusData = statusData;
+
+            if (!schedules || schedules.length === 0) {
+                listEl.innerHTML = `
+                    <div class="no-schedules">
+                        <div class="no-schedules-icon">📅</div>
+                        <div>尚未設定打卡排程</div>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '';
+            for (const schedule of schedules) {
+                const isEnabled = schedule.enabled;
+                let todayStatus = '';
+                let todayColor = '#6c757d';
+
+                if (statusData) {
+                    if (statusData.is_skip_date) {
+                        todayStatus = '今日不打卡';
+                        todayColor = '#856404';
+                    } else if (!statusData.is_workday) {
+                        todayStatus = '今日休假';
+                        todayColor = '#dc3545';
+                    } else if (schedule.last_punch_date === statusData.today) {
+                        todayStatus = '已打卡';
+                        todayColor = '#28a745';
+                    } else if (isEnabled) {
+                        todayStatus = '等待中';
+                        todayColor = '#667eea';
+                    } else {
+                        todayStatus = '未啟用';
+                    }
+                }
+
+                html += `
+                    <div class="schedule-card ${isEnabled ? 'enabled' : ''}">
+                        <div class="schedule-card-header">
+                            <div class="schedule-card-title">
+                                <span class="status-dot ${isEnabled ? 'active' : 'inactive'}"></span>
+                                ${schedule.name || '排程'}
+                            </div>
+                            <div class="schedule-card-actions">
+                                <button class="btn btn-icon btn-outline" onclick="openScheduleModal('${schedule.id}')" title="編輯">✏️</button>
+                                <button class="btn btn-icon btn-danger" onclick="deleteSchedule('${schedule.id}')" title="刪除">🗑️</button>
+                            </div>
+                        </div>
+                        <div class="schedule-card-body">
+                            <div class="schedule-info-item">
+                                <div class="schedule-info-label">打卡時間</div>
+                                <div class="schedule-info-value">${schedule.time || '--:--'}</div>
+                            </div>
+                            <div class="schedule-info-item">
+                                <div class="schedule-info-label">延遲</div>
+                                <div class="schedule-info-value">${schedule.random_delay_min || 0}~${schedule.random_delay_max || 15}分</div>
+                            </div>
+                            <div class="schedule-info-item">
+                                <div class="schedule-info-label">今日</div>
+                                <div class="schedule-info-value" style="color: ${todayColor}">${todayStatus}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            listEl.innerHTML = html;
+        }
+
+        // 開啟排程編輯 Modal
+        function openScheduleModal(scheduleId = null) {
+            const modal = document.getElementById('schedule-modal');
+            const titleEl = document.getElementById('modal-title');
+
+            if (scheduleId) {
+                // 編輯模式
+                titleEl.textContent = '編輯排程';
+                const schedule = currentSchedules.find(s => s.id === scheduleId);
+                if (schedule) {
+                    document.getElementById('edit-schedule-id').value = schedule.id;
+                    document.getElementById('edit-schedule-name').value = schedule.name || '';
+                    document.getElementById('edit-schedule-time').value = schedule.time || '09:00';
+                    document.getElementById('edit-delay-min').value = schedule.random_delay_min || 0;
+                    document.getElementById('edit-delay-max').value = schedule.random_delay_max || 15;
+                    document.getElementById('edit-schedule-enabled').checked = schedule.enabled;
+                }
+            } else {
+                // 新增模式
+                titleEl.textContent = '新增排程';
+                document.getElementById('edit-schedule-id').value = '';
+                document.getElementById('edit-schedule-name').value = '';
+                document.getElementById('edit-schedule-time').value = '09:00';
+                document.getElementById('edit-delay-min').value = 0;
+                document.getElementById('edit-delay-max').value = 15;
+                document.getElementById('edit-schedule-enabled').checked = true;
+            }
+
+            modal.classList.add('show');
+        }
+
+        function closeScheduleModal() {
+            document.getElementById('schedule-modal').classList.remove('show');
+        }
+
+        // 儲存排程
+        async function saveSchedule() {
+            const scheduleId = document.getElementById('edit-schedule-id').value;
+            const scheduleData = {
+                name: document.getElementById('edit-schedule-name').value || '排程',
+                time: document.getElementById('edit-schedule-time').value,
+                random_delay_min: parseInt(document.getElementById('edit-delay-min').value) || 0,
+                random_delay_max: parseInt(document.getElementById('edit-delay-max').value) || 15,
+                enabled: document.getElementById('edit-schedule-enabled').checked
+            };
+
+            try {
+                let resp;
+                if (scheduleId) {
+                    // 更新排程
+                    resp = await fetch(`/api/user/schedule/${scheduleId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(scheduleData)
+                    });
+                } else {
+                    // 新增排程
+                    resp = await fetch('/api/user/schedule', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(scheduleData)
+                    });
+                }
+
+                const data = await resp.json();
+                if (data.success) {
+                    closeScheduleModal();
+                    loadUserSettings();
+                    loadSchedulerStatus();
+                } else {
+                    alert(data.message || '儲存失敗');
+                }
+            } catch (e) {
+                console.error('Save schedule error:', e);
+                alert('儲存失敗');
+            }
+        }
+
+        // 刪除排程
+        async function deleteSchedule(scheduleId) {
+            if (!confirm('確定要刪除此排程嗎？')) {
+                return;
+            }
+
+            try {
+                const resp = await fetch(`/api/user/schedule/${scheduleId}`, {
+                    method: 'DELETE'
+                });
+
+                const data = await resp.json();
+                if (data.success) {
+                    loadUserSettings();
+                    loadSchedulerStatus();
+                } else {
+                    alert(data.message || '刪除失敗');
+                }
+            } catch (e) {
+                console.error('Delete schedule error:', e);
+                alert('刪除失敗');
+            }
+        }
+
+        async function loadUserSettings() {
+            try {
+                // 同時取得設定和狀態
+                const [settingsResp, statusResp] = await Promise.all([
+                    fetch('/api/user/settings'),
+                    fetch('/api/status')
+                ]);
+                const settingsData = await settingsResp.json();
+                const statusData = await statusResp.json();
+
+                if (settingsData.success && settingsData.settings) {
+                    const s = settingsData.settings;
+                    document.getElementById('telegram-token').value = s.telegram_token || '';
+                    document.getElementById('telegram-chat-id').value = s.telegram_chat_id || '';
+
+                    // 渲染排程列表
+                    renderSchedulesList(s.schedules || [], statusData);
+                }
+            } catch (e) {
+                console.error('Load user settings error:', e);
+            }
+        }
+
+        async function loadSchedulerStatus() {
+            try {
+                const resp = await fetch('/api/scheduler/status');
+                const data = await resp.json();
+
+                const statusEl = document.getElementById('scheduler-status');
+                if (data.success) {
+                    const info = data.running
+                        ? `排程器運行中，${data.enabled_schedules_count} 個排程已啟用`
+                        : '排程器未運行';
+                    statusEl.querySelector('.info').textContent = info;
+                }
+            } catch (e) {
+                console.error('Load scheduler status error:', e);
+            }
+        }
+
+        document.getElementById('save-telegram-btn').addEventListener('click', async () => {
+            const btn = document.getElementById('save-telegram-btn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading"></span>';
+
+            try {
+                const resp = await fetch('/api/user/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        schedules: currentSchedules,
+                        telegram_token: document.getElementById('telegram-token').value,
+                        telegram_chat_id: document.getElementById('telegram-chat-id').value
+                    })
+                });
+                const data = await resp.json();
+                showMessage('settings-message', data.message, !data.success);
+            } catch (e) {
+                showMessage('settings-message', '連線錯誤', true);
+            }
+
+            btn.disabled = false;
+            btn.textContent = '儲存通知設定';
+        });
 
         // 初始化
         initCalendarDate();

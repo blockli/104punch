@@ -2,11 +2,15 @@ import csv
 import json
 import os
 import random
+import threading
+import time
 import uuid
 from datetime import datetime
 from functools import wraps
 
 import requests
+from apscheduler.schedulers.background import BackgroundScheduler
+from cryptography.fernet import Fernet
 from flask import Flask, jsonify, render_template, request, session
 
 app = Flask(__name__)
@@ -19,6 +23,66 @@ DEFAULT_CHAT_ID = os.environ.get("CHAT_ID")
 absolutepath = os.path.abspath(__file__)
 SKIP_DATES_FILE = os.path.join(os.path.dirname(absolutepath), "skip_dates.json")
 PUNCH_HISTORY_FILE = os.path.join(os.path.dirname(absolutepath), "punch_history.json")
+USERS_FILE = os.path.join(os.path.dirname(absolutepath), "users.json")
+ENCRYPTION_KEY_FILE = os.path.join(os.path.dirname(absolutepath), ".encryption_key")
+
+
+# ============ 加密相關 ============
+def get_or_create_encryption_key():
+    """取得或建立加密金鑰"""
+    if os.path.exists(ENCRYPTION_KEY_FILE):
+        with open(ENCRYPTION_KEY_FILE, "rb") as f:
+            return f.read()
+    else:
+        key = Fernet.generate_key()
+        with open(ENCRYPTION_KEY_FILE, "wb") as f:
+            f.write(key)
+        return key
+
+
+def encrypt_password(password):
+    """加密密碼"""
+    key = get_or_create_encryption_key()
+    f = Fernet(key)
+    return f.encrypt(password.encode()).decode()
+
+
+def decrypt_password(encrypted_password):
+    """解密密碼"""
+    key = get_or_create_encryption_key()
+    f = Fernet(key)
+    return f.decrypt(encrypted_password.encode()).decode()
+
+
+# ============ 用戶管理 ============
+def load_users():
+    """載入所有用戶設定"""
+    if os.path.exists(USERS_FILE):
+        try:
+            with open(USERS_FILE, "r") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
+
+def save_users(users):
+    """儲存用戶設定"""
+    with open(USERS_FILE, "w") as f:
+        json.dump(users, f, ensure_ascii=False, indent=2)
+
+
+def get_user(acc):
+    """取得單一用戶"""
+    users = load_users()
+    return users.get(acc)
+
+
+def save_user(acc, user_data):
+    """儲存單一用戶"""
+    users = load_users()
+    users[acc] = user_data
+    save_users(users)
 
 
 def load_skip_dates():
@@ -115,16 +179,20 @@ def get_location():
 
 
 def get_workday():
-    """取得工作日曆表"""
+    """取得工作日曆表（自動讀取所有年份）"""
+    import glob
     pat = os.path.dirname(absolutepath)
     workday = {}
-    try:
-        with open(f"{pat}/114年中華民國政府行政機關辦公日曆表.csv", newline="") as f:
-            reader = csv.reader(f)
-            for row in reader:
-                workday[row[0]] = row[2]
-    except FileNotFoundError:
-        pass
+    # 自動讀取所有行事曆 CSV 檔案
+    for filepath in glob.glob(f"{pat}/*辦公日曆表*.csv"):
+        try:
+            with open(filepath, newline="") as f:
+                reader = csv.reader(f)
+                for row in reader:
+                    if row and len(row) >= 3:
+                        workday[row[0]] = row[2]
+        except Exception:
+            pass
     return workday
 
 
@@ -158,6 +226,158 @@ def do_punch(auth_token, acc):
         return False, f"打卡失敗: {resp.text}"
     except Exception as e:
         return False, f"連線錯誤: {str(e)}"
+
+
+# ============ 排程器相關 ============
+scheduler = BackgroundScheduler()
+scheduler_status = {"running": False, "last_check": None, "next_jobs": []}
+
+
+def is_within_punch_window(current_time, punch_time, delay_max):
+    """檢查當前時間是否在打卡時間窗口內"""
+    try:
+        current_h, current_m = map(int, current_time.split(":"))
+        punch_h, punch_m = map(int, punch_time.split(":"))
+
+        current_minutes = current_h * 60 + current_m
+        punch_start = punch_h * 60 + punch_m
+        punch_end = punch_start + delay_max
+
+        return punch_start <= current_minutes <= punch_end
+    except Exception:
+        return False
+
+
+def migrate_user_to_schedules(user):
+    """將舊格式用戶資料轉換為新的多排程格式"""
+    if "schedules" in user:
+        return user  # 已經是新格式
+
+    # 轉換舊格式到新格式
+    schedules = []
+    if user.get("punch_time"):
+        schedules.append({
+            "id": "schedule_1",
+            "name": "上班",
+            "time": user.get("punch_time", "09:00"),
+            "enabled": user.get("enabled", False),
+            "random_delay_min": user.get("random_delay_min", 0),
+            "random_delay_max": user.get("random_delay_max", 15),
+            "last_punch_date": user.get("last_punch_date", "")
+        })
+
+    user["schedules"] = schedules
+    # 保留舊欄位以便相容，但主要使用 schedules
+    return user
+
+
+def execute_scheduled_punch(user_data, schedule):
+    """執行排程打卡（帶隨機延遲）"""
+    acc = user_data.get("acc")
+    schedule_name = schedule.get("name", "排程")
+    schedule_id = schedule.get("id")
+    delay_min = schedule.get("random_delay_min", 0)
+    delay_max = schedule.get("random_delay_max", 15)
+
+    # 隨機延遲（秒）
+    delay_seconds = random.randint(delay_min * 60, delay_max * 60)
+    if delay_seconds > 0:
+        time.sleep(delay_seconds)
+
+    try:
+        # 解密密碼並取得 token
+        password = decrypt_password(user_data.get("password", ""))
+        auth_token, error = get_new_token(user_data.get("uno"), acc, password)
+
+        if not auth_token:
+            message = f"[自動打卡-{schedule_name}] {acc} - 登入失敗: {error}"
+            print(message)
+            return
+
+        # 執行打卡
+        success, punch_message = do_punch(auth_token, acc)
+        now = datetime.now()
+
+        # 記錄打卡歷史
+        add_punch_record(success, f"[自動-{schedule_name}] {punch_message}")
+
+        # 更新該排程的最後打卡日期
+        users = load_users()
+        if acc in users:
+            user = users[acc]
+            user = migrate_user_to_schedules(user)
+            for s in user.get("schedules", []):
+                if s.get("id") == schedule_id:
+                    s["last_punch_date"] = now.strftime("%Y%m%d")
+                    break
+            save_user(acc, user)
+
+        # 發送 Telegram 通知
+        tel_token = user_data.get("telegram_token") or DEFAULT_TEL_TOKEN
+        chat_id = user_data.get("telegram_chat_id") or DEFAULT_CHAT_ID
+        if tel_token and chat_id:
+            notify_msg = f"[自動打卡-{schedule_name}] {now.strftime('%Y-%m-%d %H:%M:%S')} - {punch_message}"
+            send_telegram_notify(tel_token, chat_id, notify_msg)
+
+        print(f"[自動打卡-{schedule_name}] {now.strftime('%H:%M:%S')} {acc} - {punch_message}")
+
+    except Exception as e:
+        print(f"[自動打卡-{schedule_name}] {acc} - 錯誤: {str(e)}")
+
+
+def check_and_punch():
+    """每分鐘檢查是否有用戶需要打卡"""
+    now = datetime.now()
+    today = now.strftime("%Y%m%d")
+    current_time = now.strftime("%H:%M")
+
+    scheduler_status["last_check"] = now.strftime("%Y-%m-%d %H:%M:%S")
+
+    workday = get_workday()
+    skip_dates = load_skip_dates()
+    users = load_users()
+
+    for acc, user in users.items():
+        # 轉換為新格式
+        user = migrate_user_to_schedules(user)
+
+        # 檢查是否為工作日
+        if workday.get(today) != "0":
+            continue
+
+        # 檢查是否為跳過日
+        if today in skip_dates:
+            continue
+
+        # 遍歷每個排程
+        for schedule in user.get("schedules", []):
+            # 檢查該排程是否啟用
+            if not schedule.get("enabled"):
+                continue
+
+            # 檢查該排程今天是否已打卡
+            if schedule.get("last_punch_date") == today:
+                continue
+
+            # 檢查時間窗口
+            punch_time = schedule.get("time", "09:00")
+            delay_max = schedule.get("random_delay_max", 15)
+
+            if is_within_punch_window(current_time, punch_time, delay_max):
+                # 在背景執行打卡
+                threading.Thread(
+                    target=execute_scheduled_punch,
+                    args=(user.copy(), schedule.copy())
+                ).start()
+
+
+def start_scheduler():
+    """啟動排程器"""
+    if not scheduler.running:
+        scheduler.add_job(check_and_punch, 'interval', minutes=1, id='punch_checker')
+        scheduler.start()
+        scheduler_status["running"] = True
+        print("[排程器] 已啟動，每分鐘檢查一次")
 
 
 @app.route("/")
@@ -385,5 +605,237 @@ def get_calendar_data(year_month):
     })
 
 
+# ============ 自動打卡設定 API ============
+@app.route("/api/user/settings", methods=["GET"])
+@login_required
+def get_user_settings():
+    """取得當前用戶的自動打卡設定"""
+    acc = session.get("acc")
+    user = get_user(acc)
+
+    if not user:
+        return jsonify({
+            "success": True,
+            "settings": {
+                "schedules": [],
+                "telegram_token": "",
+                "telegram_chat_id": ""
+            }
+        })
+
+    # 轉換為新格式
+    user = migrate_user_to_schedules(user)
+
+    return jsonify({
+        "success": True,
+        "settings": {
+            "schedules": user.get("schedules", []),
+            "telegram_token": user.get("telegram_token", ""),
+            "telegram_chat_id": user.get("telegram_chat_id", "")
+        }
+    })
+
+
+@app.route("/api/user/settings", methods=["POST"])
+@login_required
+def save_user_settings():
+    """儲存自動打卡設定"""
+    data = request.get_json()
+    acc = session.get("acc")
+    uno = session.get("uno")
+    password = session.get("password")
+
+    schedules = data.get("schedules", [])
+
+    # 驗證每個排程
+    for schedule in schedules:
+        # 驗證打卡時間格式
+        punch_time = schedule.get("time", "09:00")
+        try:
+            datetime.strptime(punch_time, "%H:%M")
+        except ValueError:
+            return jsonify({"success": False, "message": f"排程「{schedule.get('name', '')}」的時間格式錯誤"})
+
+        # 驗證延遲範圍
+        delay_min = int(schedule.get("random_delay_min", 0))
+        delay_max = int(schedule.get("random_delay_max", 15))
+        if delay_min < 0 or delay_max < 0 or delay_min > delay_max:
+            return jsonify({"success": False, "message": f"排程「{schedule.get('name', '')}」的延遲時間設定錯誤"})
+        if delay_max > 60:
+            return jsonify({"success": False, "message": "最大延遲不能超過 60 分鐘"})
+
+    # 取得或建立用戶資料
+    user = get_user(acc) or {}
+    user = migrate_user_to_schedules(user)
+
+    # 保留每個排程的 last_punch_date
+    existing_schedules = {s.get("id"): s for s in user.get("schedules", [])}
+    for schedule in schedules:
+        if schedule.get("id") in existing_schedules:
+            schedule["last_punch_date"] = existing_schedules[schedule["id"]].get("last_punch_date", "")
+        elif "last_punch_date" not in schedule:
+            schedule["last_punch_date"] = ""
+
+    # 更新用戶資料
+    user.update({
+        "uno": uno,
+        "acc": acc,
+        "password": encrypt_password(password),
+        "schedules": schedules,
+        "telegram_token": data.get("telegram_token", ""),
+        "telegram_chat_id": data.get("telegram_chat_id", "")
+    })
+
+    save_user(acc, user)
+
+    enabled_count = sum(1 for s in schedules if s.get("enabled"))
+    return jsonify({
+        "success": True,
+        "message": f"設定已儲存，{enabled_count} 個排程已啟用" if enabled_count > 0 else "設定已儲存"
+    })
+
+
+@app.route("/api/user/schedule", methods=["POST"])
+@login_required
+def add_schedule():
+    """新增排程"""
+    data = request.get_json()
+    acc = session.get("acc")
+    uno = session.get("uno")
+    password = session.get("password")
+
+    # 驗證打卡時間格式
+    punch_time = data.get("time", "09:00")
+    try:
+        datetime.strptime(punch_time, "%H:%M")
+    except ValueError:
+        return jsonify({"success": False, "message": "時間格式錯誤"})
+
+    # 取得或建立用戶資料
+    user = get_user(acc) or {
+        "uno": uno,
+        "acc": acc,
+        "password": encrypt_password(password),
+        "schedules": [],
+        "telegram_token": "",
+        "telegram_chat_id": ""
+    }
+    user = migrate_user_to_schedules(user)
+
+    # 產生新的排程 ID
+    existing_ids = [s.get("id", "") for s in user.get("schedules", [])]
+    new_id = f"schedule_{len(existing_ids) + 1}"
+    while new_id in existing_ids:
+        new_id = f"schedule_{int(new_id.split('_')[1]) + 1}"
+
+    new_schedule = {
+        "id": new_id,
+        "name": data.get("name", "新排程"),
+        "time": punch_time,
+        "enabled": data.get("enabled", True),
+        "random_delay_min": int(data.get("random_delay_min", 0)),
+        "random_delay_max": int(data.get("random_delay_max", 15)),
+        "last_punch_date": ""
+    }
+
+    user["schedules"].append(new_schedule)
+    user["uno"] = uno
+    user["acc"] = acc
+    user["password"] = encrypt_password(password)
+    save_user(acc, user)
+
+    return jsonify({
+        "success": True,
+        "message": f"已新增排程「{new_schedule['name']}」",
+        "schedule": new_schedule
+    })
+
+
+@app.route("/api/user/schedule/<schedule_id>", methods=["PUT"])
+@login_required
+def update_schedule(schedule_id):
+    """更新排程"""
+    data = request.get_json()
+    acc = session.get("acc")
+
+    user = get_user(acc)
+    if not user:
+        return jsonify({"success": False, "message": "用戶不存在"})
+
+    user = migrate_user_to_schedules(user)
+
+    # 找到並更新排程
+    found = False
+    for schedule in user.get("schedules", []):
+        if schedule.get("id") == schedule_id:
+            if "name" in data:
+                schedule["name"] = data["name"]
+            if "time" in data:
+                try:
+                    datetime.strptime(data["time"], "%H:%M")
+                    schedule["time"] = data["time"]
+                except ValueError:
+                    return jsonify({"success": False, "message": "時間格式錯誤"})
+            if "enabled" in data:
+                schedule["enabled"] = data["enabled"]
+            if "random_delay_min" in data:
+                schedule["random_delay_min"] = int(data["random_delay_min"])
+            if "random_delay_max" in data:
+                schedule["random_delay_max"] = int(data["random_delay_max"])
+            found = True
+            break
+
+    if not found:
+        return jsonify({"success": False, "message": "排程不存在"})
+
+    save_user(acc, user)
+    return jsonify({"success": True, "message": "排程已更新"})
+
+
+@app.route("/api/user/schedule/<schedule_id>", methods=["DELETE"])
+@login_required
+def delete_schedule(schedule_id):
+    """刪除排程"""
+    acc = session.get("acc")
+
+    user = get_user(acc)
+    if not user:
+        return jsonify({"success": False, "message": "用戶不存在"})
+
+    user = migrate_user_to_schedules(user)
+
+    # 找到並刪除排程
+    schedules = user.get("schedules", [])
+    original_len = len(schedules)
+    user["schedules"] = [s for s in schedules if s.get("id") != schedule_id]
+
+    if len(user["schedules"]) == original_len:
+        return jsonify({"success": False, "message": "排程不存在"})
+
+    save_user(acc, user)
+    return jsonify({"success": True, "message": "排程已刪除"})
+
+
+@app.route("/api/scheduler/status")
+def get_scheduler_status():
+    """取得排程器狀態"""
+    users = load_users()
+    enabled_schedules_count = 0
+    for acc, user in users.items():
+        user = migrate_user_to_schedules(user)
+        for schedule in user.get("schedules", []):
+            if schedule.get("enabled"):
+                enabled_schedules_count += 1
+
+    return jsonify({
+        "success": True,
+        "running": scheduler_status["running"],
+        "last_check": scheduler_status["last_check"],
+        "enabled_schedules_count": enabled_schedules_count
+    })
+
+
 if __name__ == "__main__":
+    # 啟動排程器
+    start_scheduler()
     app.run(debug=True, host="0.0.0.0", port=5001)
