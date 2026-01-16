@@ -172,4 +172,5 @@ assets/*
 ajilog.json
 .pytest*
 .vscode
+.encryption_key
 tests/cassettes/*
