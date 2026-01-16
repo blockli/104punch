@@ -85,43 +85,45 @@ def save_user(acc, user_data):
     save_users(users)
 
 
-def load_skip_dates():
-    """載入不打卡日期"""
-    if os.path.exists(SKIP_DATES_FILE):
-        try:
-            with open(SKIP_DATES_FILE, "r") as f:
-                return json.load(f)
-        except Exception:
-            pass
+def load_skip_dates(acc=None):
+    """載入不打卡日期（用戶專屬）"""
+    if acc:
+        user = get_user(acc)
+        if user:
+            return user.get("skip_dates", [])
     return []
 
 
-def save_skip_dates(dates):
-    """儲存不打卡日期"""
-    with open(SKIP_DATES_FILE, "w") as f:
-        json.dump(dates, f, ensure_ascii=False, indent=2)
+def save_skip_dates(dates, acc=None):
+    """儲存不打卡日期（用戶專屬）"""
+    if acc:
+        user = get_user(acc)
+        if user:
+            user["skip_dates"] = dates
+            save_user(acc, user)
 
 
-def load_punch_history():
-    """載入打卡紀錄"""
-    if os.path.exists(PUNCH_HISTORY_FILE):
-        try:
-            with open(PUNCH_HISTORY_FILE, "r") as f:
-                return json.load(f)
-        except Exception:
-            pass
+def load_punch_history(acc=None):
+    """載入打卡紀錄（用戶專屬）"""
+    if acc:
+        user = get_user(acc)
+        if user:
+            return user.get("punch_history", [])
     return []
 
 
-def save_punch_history(history):
-    """儲存打卡紀錄"""
-    with open(PUNCH_HISTORY_FILE, "w") as f:
-        json.dump(history, f, ensure_ascii=False, indent=2)
+def save_punch_history(history, acc=None):
+    """儲存打卡紀錄（用戶專屬）"""
+    if acc:
+        user = get_user(acc)
+        if user:
+            user["punch_history"] = history
+            save_user(acc, user)
 
 
-def add_punch_record(success, message):
-    """新增一筆打卡紀錄"""
-    history = load_punch_history()
+def add_punch_record(success, message, acc=None):
+    """新增一筆打卡紀錄（用戶專屬）"""
+    history = load_punch_history(acc)
     now = datetime.now()
     record = {
         "date": now.strftime("%Y%m%d"),
@@ -133,7 +135,7 @@ def add_punch_record(success, message):
     history.append(record)
     # 只保留最近 100 筆
     history = history[-100:]
-    save_punch_history(history)
+    save_punch_history(history, acc)
     return record
 
 
@@ -250,39 +252,50 @@ def is_within_punch_window(current_time, punch_time, delay_max):
 
 def migrate_user_to_schedules(user):
     """將舊格式用戶資料轉換為新的多排程格式"""
-    if "schedules" in user:
-        return user  # 已經是新格式
+    if "schedules" not in user:
+        # 轉換舊格式到新格式
+        schedules = []
+        if user.get("punch_time"):
+            schedules.append({
+                "id": "schedule_1",
+                "name": "上班",
+                "time": user.get("punch_time", "09:00"),
+                "enabled": user.get("enabled", False),
+                "random_delay_min": user.get("random_delay_min", 0),
+                "random_delay_max": user.get("random_delay_max", 15),
+                "last_punch_date": user.get("last_punch_date", "")
+            })
+        user["schedules"] = schedules
 
-    # 轉換舊格式到新格式
-    schedules = []
-    if user.get("punch_time"):
-        schedules.append({
-            "id": "schedule_1",
-            "name": "上班",
-            "time": user.get("punch_time", "09:00"),
-            "enabled": user.get("enabled", False),
-            "random_delay_min": user.get("random_delay_min", 0),
-            "random_delay_max": user.get("random_delay_max", 15),
-            "last_punch_date": user.get("last_punch_date", "")
-        })
+    # 確保 skip_dates 和 punch_history 存在
+    if "skip_dates" not in user:
+        user["skip_dates"] = []
+    if "punch_history" not in user:
+        user["punch_history"] = []
 
-    user["schedules"] = schedules
-    # 保留舊欄位以便相容，但主要使用 schedules
     return user
 
 
-def execute_scheduled_punch(user_data, schedule):
-    """執行排程打卡（帶隨機延遲）"""
+def execute_scheduled_punch(user_data, schedule, retry_count=0):
+    """執行排程打卡（帶隨機延遲和重試機制）"""
+    MAX_RETRIES = 3
+    RETRY_DELAY = 30  # 重試間隔秒數
+
     acc = user_data.get("acc")
     schedule_name = schedule.get("name", "排程")
     schedule_id = schedule.get("id")
     delay_min = schedule.get("random_delay_min", 0)
     delay_max = schedule.get("random_delay_max", 15)
 
-    # 隨機延遲（秒）
-    delay_seconds = random.randint(delay_min * 60, delay_max * 60)
-    if delay_seconds > 0:
-        time.sleep(delay_seconds)
+    # 取得 Telegram 設定（提前取得以便失敗時也能通知）
+    tel_token = user_data.get("telegram_token") or DEFAULT_TEL_TOKEN
+    chat_id = user_data.get("telegram_chat_id") or DEFAULT_CHAT_ID
+
+    # 隨機延遲（秒）- 只在首次執行時延遲
+    if retry_count == 0:
+        delay_seconds = random.randint(delay_min * 60, delay_max * 60)
+        if delay_seconds > 0:
+            time.sleep(delay_seconds)
 
     try:
         # 解密密碼並取得 token
@@ -290,16 +303,39 @@ def execute_scheduled_punch(user_data, schedule):
         auth_token, error = get_new_token(user_data.get("uno"), acc, password)
 
         if not auth_token:
-            message = f"[自動打卡-{schedule_name}] {acc} - 登入失敗: {error}"
+            now = datetime.now()
+            retry_info = f"(第 {retry_count + 1} 次)" if retry_count > 0 else ""
+            message = f"[自動打卡-{schedule_name}] {acc} - 登入失敗{retry_info}: {error}"
             print(message)
+
+            # 重試機制
+            if retry_count < MAX_RETRIES - 1:
+                print(f"[自動打卡-{schedule_name}] {acc} - 將在 {RETRY_DELAY} 秒後重試...")
+                time.sleep(RETRY_DELAY)
+                return execute_scheduled_punch(user_data, schedule, retry_count + 1)
+
+            # 已達最大重試次數，發送失敗通知
+            add_punch_record(False, f"[自動-{schedule_name}] 登入失敗: {error}", acc)
+            if tel_token and chat_id:
+                notify_msg = f"[自動打卡-{schedule_name}] {now.strftime('%Y-%m-%d %H:%M:%S')} - 登入失敗（已重試 {MAX_RETRIES} 次）: {error}"
+                send_telegram_notify(tel_token, chat_id, notify_msg)
             return
 
         # 執行打卡
         success, punch_message = do_punch(auth_token, acc)
         now = datetime.now()
 
-        # 記錄打卡歷史
-        add_punch_record(success, f"[自動-{schedule_name}] {punch_message}")
+        # 打卡失敗時重試
+        if not success and retry_count < MAX_RETRIES - 1:
+            retry_info = f"(第 {retry_count + 1} 次)"
+            print(f"[自動打卡-{schedule_name}] {acc} - 打卡失敗{retry_info}: {punch_message}")
+            print(f"[自動打卡-{schedule_name}] {acc} - 將在 {RETRY_DELAY} 秒後重試...")
+            time.sleep(RETRY_DELAY)
+            return execute_scheduled_punch(user_data, schedule, retry_count + 1)
+
+        # 記錄打卡歷史（用戶專屬）
+        retry_info = f"(重試 {retry_count} 次後)" if retry_count > 0 else ""
+        add_punch_record(success, f"[自動-{schedule_name}] {punch_message}{retry_info}", acc)
 
         # 更新該排程的最後打卡日期
         users = load_users()
@@ -313,16 +349,29 @@ def execute_scheduled_punch(user_data, schedule):
             save_user(acc, user)
 
         # 發送 Telegram 通知
-        tel_token = user_data.get("telegram_token") or DEFAULT_TEL_TOKEN
-        chat_id = user_data.get("telegram_chat_id") or DEFAULT_CHAT_ID
         if tel_token and chat_id:
-            notify_msg = f"[自動打卡-{schedule_name}] {now.strftime('%Y-%m-%d %H:%M:%S')} - {punch_message}"
+            notify_msg = f"[自動打卡-{schedule_name}] {now.strftime('%Y-%m-%d %H:%M:%S')} - {punch_message}{retry_info}"
             send_telegram_notify(tel_token, chat_id, notify_msg)
 
-        print(f"[自動打卡-{schedule_name}] {now.strftime('%H:%M:%S')} {acc} - {punch_message}")
+        print(f"[自動打卡-{schedule_name}] {now.strftime('%H:%M:%S')} {acc} - {punch_message}{retry_info}")
 
     except Exception as e:
-        print(f"[自動打卡-{schedule_name}] {acc} - 錯誤: {str(e)}")
+        now = datetime.now()
+        retry_info = f"(第 {retry_count + 1} 次)" if retry_count > 0 else ""
+        error_msg = str(e)
+        print(f"[自動打卡-{schedule_name}] {acc} - 錯誤{retry_info}: {error_msg}")
+
+        # 重試機制
+        if retry_count < MAX_RETRIES - 1:
+            print(f"[自動打卡-{schedule_name}] {acc} - 將在 {RETRY_DELAY} 秒後重試...")
+            time.sleep(RETRY_DELAY)
+            return execute_scheduled_punch(user_data, schedule, retry_count + 1)
+
+        # 已達最大重試次數，發送失敗通知
+        add_punch_record(False, f"[自動-{schedule_name}] 程式錯誤: {error_msg}", acc)
+        if tel_token and chat_id:
+            notify_msg = f"[自動打卡-{schedule_name}] {now.strftime('%Y-%m-%d %H:%M:%S')} - 程式錯誤（已重試 {MAX_RETRIES} 次）: {error_msg}"
+            send_telegram_notify(tel_token, chat_id, notify_msg)
 
 
 def check_and_punch():
@@ -334,7 +383,6 @@ def check_and_punch():
     scheduler_status["last_check"] = now.strftime("%Y-%m-%d %H:%M:%S")
 
     workday = get_workday()
-    skip_dates = load_skip_dates()
     users = load_users()
 
     for acc, user in users.items():
@@ -345,8 +393,9 @@ def check_and_punch():
         if workday.get(today) != "0":
             continue
 
-        # 檢查是否為跳過日
-        if today in skip_dates:
+        # 檢查是否為跳過日（用戶專屬）
+        user_skip_dates = user.get("skip_dates", [])
+        if today in user_skip_dates:
             continue
 
         # 遍歷每個排程
@@ -364,6 +413,17 @@ def check_and_punch():
             delay_max = schedule.get("random_delay_max", 15)
 
             if is_within_punch_window(current_time, punch_time, delay_max):
+                # 立即更新 last_punch_date 以避免重複觸發
+                users = load_users()
+                if acc in users:
+                    u = users[acc]
+                    u = migrate_user_to_schedules(u)
+                    for s in u.get("schedules", []):
+                        if s.get("id") == schedule.get("id"):
+                            s["last_punch_date"] = today
+                            break
+                    save_user(acc, u)
+
                 # 在背景執行打卡
                 threading.Thread(
                     target=execute_scheduled_punch,
@@ -436,12 +496,13 @@ def punch():
 
     success, message = do_punch(new_token, acc)
 
-    # 記錄打卡歷史
-    record = add_punch_record(success, message)
+    # 記錄打卡歷史（用戶專屬）
+    record = add_punch_record(success, message, acc)
 
     # 發送 Telegram 通知 (如果有設定)
-    tel_token = DEFAULT_TEL_TOKEN
-    chat_id = DEFAULT_CHAT_ID
+    user = get_user(acc)
+    tel_token = user.get("telegram_token") if user else None or DEFAULT_TEL_TOKEN
+    chat_id = user.get("telegram_chat_id") if user else None or DEFAULT_CHAT_ID
     if tel_token and chat_id:
         notify_msg = f"[手動打卡] {record['datetime']} - {message}"
         send_telegram_notify(tel_token, chat_id, notify_msg)
@@ -459,15 +520,16 @@ def status():
     logged_in = "auth_token" in session
     now = datetime.now()
     today = now.strftime("%Y%m%d")
+    acc = session.get("acc") if logged_in else None
 
     workday = get_workday()
-    skip_dates = load_skip_dates()
+    skip_dates = load_skip_dates(acc) if acc else []
     is_workday = workday.get(today, "0") == "0"
     is_skip_date = today in skip_dates
 
     return jsonify({
         "logged_in": logged_in,
-        "acc": session.get("acc") if logged_in else None,
+        "acc": acc,
         "current_time": now.strftime("%Y-%m-%d %H:%M:%S"),
         "today": today,
         "is_workday": is_workday,
@@ -479,8 +541,9 @@ def status():
 @app.route("/api/skip-dates", methods=["GET"])
 @login_required
 def get_skip_dates():
-    """取得不打卡日期列表"""
-    skip_dates = load_skip_dates()
+    """取得不打卡日期列表（用戶專屬）"""
+    acc = session.get("acc")
+    skip_dates = load_skip_dates(acc)
     # 轉換格式方便前端顯示
     formatted = []
     for d in skip_dates:
@@ -499,7 +562,8 @@ def get_skip_dates():
 @app.route("/api/skip-dates", methods=["POST"])
 @login_required
 def add_skip_date():
-    """新增不打卡日期"""
+    """新增不打卡日期（用戶專屬）"""
+    acc = session.get("acc")
     data = request.get_json()
     date = data.get("date", "").strip()
 
@@ -513,14 +577,14 @@ def add_skip_date():
     except ValueError:
         return jsonify({"success": False, "message": "日期格式錯誤"})
 
-    skip_dates = load_skip_dates()
+    skip_dates = load_skip_dates(acc)
 
     if date_key in skip_dates:
         return jsonify({"success": False, "message": "此日期已存在"})
 
     skip_dates.append(date_key)
     skip_dates.sort()
-    save_skip_dates(skip_dates)
+    save_skip_dates(skip_dates, acc)
 
     return jsonify({"success": True, "message": f"已新增 {date}"})
 
@@ -528,14 +592,15 @@ def add_skip_date():
 @app.route("/api/skip-dates/<date>", methods=["DELETE"])
 @login_required
 def delete_skip_date(date):
-    """刪除不打卡日期"""
-    skip_dates = load_skip_dates()
+    """刪除不打卡日期（用戶專屬）"""
+    acc = session.get("acc")
+    skip_dates = load_skip_dates(acc)
 
     if date not in skip_dates:
         return jsonify({"success": False, "message": "日期不存在"})
 
     skip_dates.remove(date)
-    save_skip_dates(skip_dates)
+    save_skip_dates(skip_dates, acc)
 
     return jsonify({"success": True, "message": "已刪除"})
 
@@ -543,8 +608,9 @@ def delete_skip_date(date):
 @app.route("/api/punch-history")
 @login_required
 def get_punch_history():
-    """取得打卡紀錄"""
-    history = load_punch_history()
+    """取得打卡紀錄（用戶專屬）"""
+    acc = session.get("acc")
+    history = load_punch_history(acc)
     # 反轉順序，最新的在前面
     return jsonify({"success": True, "history": list(reversed(history))})
 
@@ -552,7 +618,8 @@ def get_punch_history():
 @app.route("/api/calendar/<year_month>")
 @login_required
 def get_calendar_data(year_month):
-    """取得月曆資料"""
+    """取得月曆資料（用戶專屬）"""
+    acc = session.get("acc")
     try:
         year = int(year_month[:4])
         month = int(year_month[4:])
@@ -564,10 +631,10 @@ def get_calendar_data(year_month):
     cal = calendar.Calendar(firstweekday=6)  # 週日開始
     month_days = cal.monthdayscalendar(year, month)
 
-    # 載入資料
+    # 載入資料（用戶專屬）
     workday = get_workday()
-    skip_dates = load_skip_dates()
-    punch_history = load_punch_history()
+    skip_dates = load_skip_dates(acc)
+    punch_history = load_punch_history(acc)
 
     # 建立打卡日期對照表
     punch_dates = {}
@@ -718,7 +785,9 @@ def add_schedule():
         "password": encrypt_password(password),
         "schedules": [],
         "telegram_token": "",
-        "telegram_chat_id": ""
+        "telegram_chat_id": "",
+        "skip_dates": [],
+        "punch_history": []
     }
     user = migrate_user_to_schedules(user)
 
